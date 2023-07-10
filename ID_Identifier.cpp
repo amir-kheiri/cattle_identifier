@@ -113,7 +113,6 @@ map <string, Mat> descriptors_of_train(string main_dataset_pic)
 		const auto train_img_des = orb_descriptor_keypoints(image_train);
 		// const auto train_img_des = sift_descriptor_keypoints(image_train);
 
-
 		descriptor_train_list.push_back({ train_cow_name, train_img_des });
 		descriptor_train_dict[train_cow_name] = train_img_des;
 	}
