@@ -93,8 +93,6 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 	tuple<vector<string>, vector<string>, map<string, string>> name_and_tag_list;
 
 
-	vector<string> name_img_init;
-	vector<string> tag_img_init;
 	map<string, string> tag_name_dicts;
 
 	int counter = 0;
@@ -110,15 +108,9 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 		
 		name_and_tag_list = name_tag_list_reader(subfolder_path); //main_pic, labels_path);
 
-		name_img_init = get<0>(name_and_tag_list);// name_and_tag_list[0];
-		tag_img_init  = get<1>(name_and_tag_list);
 		tag_name_dicts= get<2>(name_and_tag_list);
 
-		/*total_name_img_init.push_back(name_img_init);
-		total_name_img_init.push_back(tag_img_init);*/
 
-		//map<string, int> name_to_tag;
-		
 
 		total_img_from_name_img1 += tag_name_dicts.size();
 
@@ -133,18 +125,7 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 				tag_img.push_back({ tag, subfolder_name.path().filename().string() });
 			 }
 		}
-/*
-		for (const auto& [name, tag] : name_to_tag) 
-		{
-			if (tag != "0" && tag != "1" && count(name_to_tag.begin(), name_to_tag.end(), make_pair(name, tag)) > 1) 
-			{
-				name_img.push_back({ name, subfolder_name.path().filename().string(), tag });
-			}
-			if (tag != "0" && tag != "1" && count(name_to_tag.begin(), name_to_tag.end(), make_pair(name, tag)) > 1) 
-			{
-				tag_img.push_back({ tag, subfolder_name.path().filename().string() });
-			}
-		}*/
+
 
 		total_img_from_name_img += name_img.size();
 
@@ -160,8 +141,11 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 			
 			if (tag_img[j][0] != tag_img[j + 1][0])
 			{
-				int select = rand() % lenv + (j - lenv + 1);
-				train_name_tag_list.push_back({ (name_img[select][0]), (tag_img[select][0] )});
+				int select = (rand() % (j - (j-lenv+1)+1)) + (j - lenv + 1);
+
+//				cout << (rand() % (ub - lb + 1)) + lb << " ";
+
+				train_name_tag_list.push_back({ (name_img[select][0]), (tag_img[select][0]) });
 				train_tag_list.push_back({ tag_img[select][0] });
 
 				for (int x = j - lenv + 1; x <= j; x++) {
@@ -175,7 +159,9 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 		}
 
 		lenv++;
-		int select = rand() % (tag_img.size() - lenv) + (tag_img.size() - lenv);
+		//int select = rand() % (tag_img.size() - lenv) + (tag_img.size() - lenv);
+		int select = (rand() % ((tag_img.size()-1) - (tag_img.size()-lenv)+1 ) ) + (tag_img.size() - lenv);
+		
 		train_name_tag_list.push_back({ name_img[select][0], tag_img[select][0] });
 		train_tag_list.push_back({ tag_img[select][0] });
 
@@ -186,6 +172,8 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 				test_name_tag_list.push_back({ name_img[x][0], tag_img[x][0] });
 			}
 		}
+		name_img.clear();
+		tag_img.clear();
 
 	}
 
