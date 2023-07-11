@@ -76,14 +76,16 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 	vector<string> label_folders_names;
 
 /*
-	for (const auto& entry : fs::directory_iterator(main_labels_path)) {
+	for (const auto& entry : fs::directory_iterator(main_labels_path)) 
+	{
 		if (entry.is_directory()) {
 			label_folders_names.push_back(entry.path().filename().string());
 		}
 	}*/
 
-	vector<vector<string>> train_name_tag_list;
 	vector<vector<string>> train_tag_list;
+	vector<vector<string>> train_name_tag_list;
+
 	vector<vector<string>> test_name_tag_list;
 	tuple <vector<vector<string>>, vector<vector<string>>> chosen_test_train_dataset;
 
@@ -91,8 +93,7 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 	vector<vector<string>> tag_img;
 
 	tuple<vector<string>, vector<string>, map<string, string>> name_and_tag_list;
-
-
+	
 	map<string, string> tag_name_dicts;
 
 	int counter = 0;
@@ -111,7 +112,6 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 		tag_name_dicts= get<2>(name_and_tag_list);
 
 
-
 		total_img_from_name_img1 += tag_name_dicts.size();
 
 		for (const auto& [name, tag] : tag_name_dicts)
@@ -126,7 +126,7 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 			 }
 		}
 
-
+	
 		total_img_from_name_img += name_img.size();
 
 		if (tag_img.empty()) 
@@ -135,20 +135,20 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 		}
 
 		int lenv = 0;
+/*
 		for (int j = 0; j < tag_img.size() - 1; j++) 
 		{
 			lenv++;
 			
-			if (tag_img[j][0] != tag_img[j + 1][0])
+			if (tag_img[j][0] != tag_img[j+1][0])
 			{
 				int select = (rand() % (j - (j-lenv+1)+1)) + (j - lenv + 1);
-
-//				cout << (rand() % (ub - lb + 1)) + lb << " ";
 
 				train_name_tag_list.push_back({ (name_img[select][0]), (tag_img[select][0]) });
 				train_tag_list.push_back({ tag_img[select][0] });
 
-				for (int x = j - lenv + 1; x <= j; x++) {
+				for (int x = j - lenv + 1; x <= j; x++)
+				{
 					if (x != select) 
 					{
 						test_name_tag_list.push_back({ name_img[x][0], tag_img[x][0] });
@@ -157,19 +157,42 @@ tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& 
 				lenv = 0;
 			}
 		}
+*/
+
+		for (int j=0; j<tag_img.size()- 1; j++)
+		{
+			lenv++;
+
+			if (tag_img[j][0] != tag_img[j + 1][0])
+			{
+				int select = (rand() % (j - (j - lenv + 1) + 1)) + (j - lenv + 1);
+
+				train_name_tag_list.push_back({ name_img[select][0], name_img[select][1], name_img[select][2] });
+				train_tag_list.push_back({ tag_img[select][0] });
+
+				for (int x = j - lenv + 1; x <= j; x++)
+				{
+					if (x != select)
+					{
+						test_name_tag_list.push_back({ name_img[x][0], name_img[select][1],name_img[select][2] });
+					}
+				}
+				lenv = 0;
+			}
+		}
 
 		lenv++;
 		//int select = rand() % (tag_img.size() - lenv) + (tag_img.size() - lenv);
-		int select = (rand() % ((tag_img.size()-1) - (tag_img.size()-lenv)+1 ) ) + (tag_img.size() - lenv);
-		
-		train_name_tag_list.push_back({ name_img[select][0], tag_img[select][0] });
+		int select = (rand() % (tag_img.size() - (tag_img.size()-lenv) ) ) + (tag_img.size() - lenv);
+
+		train_name_tag_list.push_back({ name_img[select][0], name_img[select][1], name_img[select][2] });
 		train_tag_list.push_back({ tag_img[select][0] });
 
 		for (int x = tag_img.size() - lenv; x < tag_img.size(); x++) 
 		{
 			if (x != select) 
 			{
-				test_name_tag_list.push_back({ name_img[x][0], tag_img[x][0] });
+				test_name_tag_list.push_back({ name_img[x][0], name_img[select][1],name_img[select][2] });
 			}
 		}
 		name_img.clear();
