@@ -1,214 +1,291 @@
 
 #include <iostream>
-#include <vector>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <random>
+//#include <tuple> 
+//#include <boost/timer.hpp>
 
-#include <unordered_map>
-#include<string>
+#include <opencv2/opencv.hpp>
+#include "opencv2/xfeatures2d.hpp"
+#include "opencv2/features2d.hpp"
 
-#include <filesystem>
+#include "dataset_random_spliter.h"
+
 using namespace std;
+using namespace cv;
+using namespace cv::xfeatures2d;
 
-//using namespace filesystem;
-namespace fs = std::experimental::filesystem;
 
-
-tuple<vector<string>, vector<string>, map<string,string>> name_tag_list_reader(const string& subfolder_path)
-	                                                            
+Mat read_image( string& path)//(Mat& img, const string& path)
 {
-	ifstream inputFile;
-	//string train_img_path = labels_path + "\\" + train_subfolder_address + "/" + train_cow_name;
+	//Mat& img=0;
+	Mat img = imread(path, IMREAD_COLOR);
+	return img;
+	//img = imread(path, IMREAD_COLOR);
+}
 
-	inputFile.open(subfolder_path);
+tuple <Mat, vector<KeyPoint>> orb_descriptor_keypoints( Mat& img1)
+{
+	Ptr<ORB> orb = ORB::create(500);
+	vector<KeyPoint> kp1;
+	Mat des1;
+	orb->detectAndCompute(img1, Mat(), kp1, des1);
+	return tuple(des1 , kp1);
+}
 
-	string name;
-	string tag;
-	string tempString;
-	string line = "";
 
-	tuple<vector<string>, vector<string>, map<string,string> > nameListAndImgList;
+vector<DMatch> matcher_orb( Mat& des_test,  Mat& des_train )
+{
+	//BFMatcher matcher(NORM_HAMMING, true);
 
-	vector<string> cow_name_list;
-	vector<string> tag_list;
-	map<string, string> name_tag_match_dict;
+	vector<DMatch> matches;
+	Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
+	//Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create(DescriptorMatcher::BRUTEFORCE);
 
-	while (getline(inputFile, line))
+	matcher->match(des_test, des_train, matches, Mat());
+	//brute_force.match(des_test, des_train, matches);	
+
+	// Sort matches by score
+	std::sort(matches.begin(), matches.end());
+
+	// Remove not  good matches
+	/*const float GOOD_MATCH_PERCENT = 0.15f;
+
+	int numGoodMatches = matches.size() * GOOD_MATCH_PERCENT;
+	matches.erase(matches.begin() + numGoodMatches, matches.end());*/
+	//returnr matches.size()
+	return matches;
+}
+
+void draw_matches(Mat& im1, Mat& im2, vector<KeyPoint> kp1, vector<KeyPoint> kp2, vector<DMatch> matches)
+{
+	// Draw  matches
+	Mat imMatches;
+	drawMatches(im1, kp1, im2, kp2, matches, imMatches);
+	imwrite("matches.jpg", imMatches);
+}
+
+
+//Mat sift_descriptor_keypoints(const Mat& img1)
+//{
+//	Ptr<SIFT> sift = SIFT::create();
+//	vector<KeyPoint> kp1;
+//	Mat des1;
+//	sift->detectAndCompute(img1, noArray(), kp1, des1);
+//	return des1;
+//}
+
+//int matcher_sift(const Mat& des_test, const Mat& des_train)
+//{
+//	BFMatcher bf(NORM_L2);
+//	vector<vector<DMatch>> matches;
+//	bf.knnMatch(des_test, des_train, matches, 2);
+//
+//	vector<DMatch> good_match;
+//	for (size_t i = 0; i < matches.size(); i++)
+//	{
+//		if (matches[i][0].distance < 0.85 * matches[i][1].distance)
+//		{
+//			good_match.push_back(matches[i][0]);
+//		}
+//	}
+//	return good_match.size();
+//}
+
+
+tuple <map<string,Mat>, map<string,vector<KeyPoint>>> descriptors_of_train(string main_dataset_pic,
+	                                                                         vector<vector<string>>train_name_adress_tag_list)
+ {
+	int true_pred_process = 0;
+
+	//vector<tuple<string, string, int >> train_name_tag_list;
+	//vector< tuple <tuple<string, string,int>, tuple<int,string> > > train_name_adress_tag_list;
+	vector<tuple<string, string, int >> train_name_list;
+
+
+	vector<KeyPoint> keypoints1, keypoints2;
+	vector <tuple <string, Mat >> descriptor_train_list;
+	map <string, Mat> descriptor_train_dict;
+	map < string, vector<KeyPoint> > keypoints_train_dict;
+	tuple < map <string, Mat>, map < string, vector<KeyPoint> >> return_descriptor_and_keypoints;
+
+/*
+	for (const auto& item : train_name_adress_tag_list) 
 	{
-		stringstream inputString(line);
-	
-		getline(inputString, name, ',');
-		getline(inputString, tempString, ',');
-		tag = tempString;
-
-		getline(inputString, tempString);
-
-		
-		if (name != "rgb")
-		{
-			cow_name_list.push_back(name);
-			tag_list.push_back(tag);
-			name_tag_match_dict.insert(pair<string, string>(name, tag));
-		}
-		line = "";
+		train_name_list.push_back(get<0>(item));
 	}
+	*/
+	for ( auto& train_data : train_name_adress_tag_list)// train_name_list)
+	{
+		/*
+		const auto& train_cow_name = get<0>(train_data);
+		const auto& train_subfolder_address = get<1>(train_data);
+		const auto& train_tag = get<2>(train_data);*/
 
-	get<0>(nameListAndImgList) = cow_name_list;
-	get<1>(nameListAndImgList) = tag_list;
-	get<2>(nameListAndImgList) = name_tag_match_dict;
-	   
-	//nameListAndImgList.push_back(tuple(cow_name_list,tag_list));
+		auto& train_cow_name = train_data[0];
+		auto& train_subfolder_address = train_data[1];
+		auto& train_tag = train_data[2];
 
-	return nameListAndImgList;
+		string train_img_path = main_dataset_pic + "\\" + train_subfolder_address + "\\" + train_cow_name;
+		auto image_train = read_image(train_img_path);
+
+		tuple <Mat, vector<KeyPoint>>train_img_des_kp;
+		train_img_des_kp = orb_descriptor_keypoints(image_train);
+		auto train_img_des = get<0>(train_img_des_kp);
+		auto train_img_kp  = get<1>(train_img_des_kp);
+		// const auto train_img_des = sift_descriptor_keypoints(image_train);
+		
+		descriptor_train_list.push_back({ train_cow_name, train_img_des });
+		descriptor_train_dict[train_cow_name] = train_img_des;
+		keypoints_train_dict[train_cow_name] = train_img_kp ;
+		
+	}
+	get<0>(return_descriptor_and_keypoints) = descriptor_train_dict;
+	get<1>(return_descriptor_and_keypoints) = keypoints_train_dict;
+
+	return return_descriptor_and_keypoints;
 }
 
 
 
-tuple <vector<vector<string>>, vector<vector<string>>> preprocess(const string& main_pic,
-	                                                              const string& labels_path) 
-  {
-
-	string main_dataset_pic = main_pic;
-	string main_labels_path = labels_path;
-	vector<string> label_folders_names;
-
-/*
-	for (const auto& entry : fs::directory_iterator(main_labels_path)) 
-	{
-		if (entry.is_directory()) {
-			label_folders_names.push_back(entry.path().filename().string());
-		}
-	}*/
-
-	vector<vector<string>> train_tag_list;
-	vector<vector<string>> train_name_tag_list;
-
-	vector<vector<string>> test_name_tag_list;
-	tuple <vector<vector<string>>, vector<vector<string>>> chosen_test_train_dataset;
-
-	vector<vector<string>> name_img;
-	vector<vector<string>> tag_img;
-
-	tuple<vector<string>, vector<string>, map<string, string>> name_and_tag_list;
+auto matching_test_train(string main_dataset_pic,
+	                     vector<vector<string>> train_name_list,
+	                     vector<vector<string>> test_name_list,
+	                     map<string,Mat> descriptor_train_dict)
+{
+//	map <string, Mat> descriptor_train_dict;
 	
-	map<string, string> tag_name_dicts;
+	//clock_t init_time = clock();
 
 	int counter = 0;
-	int total_img_from_name_img1 = 0;
-	int total_img_from_name_img = 0;
+	int true_pred_process = 0;
 
-	for (const auto& subfolder_name : fs::directory_iterator(main_dataset_pic))
+	map <string, Mat> numbers_pattern_total;
+	map <string, tuple<int,int> > pred;
+	string pred_cow_in_train;
+	tuple <Mat, vector<KeyPoint>>test_img_des_kp;
+
+
+	vector <tuple<string, string, int, int, string, string> > pred_list;
+
+	/*pred_list.append([test_cow_name, pred_cow_in_train, pred_tag, real_tag,
+		test_subfolder_address, train_subfolder_address])*/
+
+
+	for ( auto& test_data : test_name_list) 
 	{
+		clock_t init_time = clock();
+
+		auto test_cow_name = test_data[0];
+		auto test_subfolder_address = test_data[1];
+		auto test_tag = test_data[2];
+
 		counter += 1;
-		cout << subfolder_name << endl;
+		auto test_img_path = main_dataset_pic + "\\" + test_subfolder_address + "\\" + test_cow_name;
+		auto image_test = read_image(test_img_path);
 
-		string subfolder_path = main_labels_path + "\\" + subfolder_name.path().filename().string()+".csv";
+		test_img_des_kp = orb_descriptor_keypoints(image_test);
+		auto test_img_des = get<0>(test_img_des_kp);
+		auto test_img_kp  = get<1>(test_img_des_kp);
+		//const auto test_img_des = orb_descriptor_keypoints(image_test);
+		// const auto test_img_des = sift_descriptor_keypoints(image_test);
+
+		int max_keypoint = 0;
+		int pred_tag;
+		string train_subfolder_address;
+
+		for ( auto& train_data : train_name_list)
+		{			
+			auto& train_cow_name = train_data[0];
+			auto& train_subfolder_address = train_data[1];
+			auto& train_tag = train_data[2];
+
+		/*	auto train_img_path= main_dataset_pic+ "\\" + train_subfolder_address +"\\" + train_cow_name;
+			auto image_train = read_image(train_img_path);*/
+
+			auto matches_result = matcher_orb( test_img_des, descriptor_train_dict[train_cow_name] );
+			int no_of_pattern = matches_result.size();
+
+			//const int no_of_pattern = matcher_sift(test_img_des, descriptor_train_dict[train_cow_name]);
+			// const int no_of_pattern = matcher_flann(test_img_des, descriptor_train_dict[train_cow_name]);
+
+			if (no_of_pattern > max_keypoint)
+			{
+				max_keypoint = no_of_pattern;
+				pred_tag = stoi(train_tag);
+				pred_cow_in_train = train_cow_name;
+			}
+		}
+
+		numbers_pattern_total[test_cow_name] = max_keypoint;
+		int real_tag = stoi(test_tag);
+
+		pred[test_cow_name] = { pred_tag, real_tag };
+
+		pred_list.push_back({ test_cow_name, pred_cow_in_train, pred_tag, real_tag,
+							 test_subfolder_address, train_subfolder_address });
+
+		int target;
+		int refrence;
+		for (auto& items : pred)
+		{  						
+			target  = get<0>(items.second);
+			refrence= get<1>(items.second);
+						
+			if (target == refrence) 
+			{
+				true_pred_process += 1;
+			}
+		}
 		
-		name_and_tag_list = name_tag_list_reader(subfolder_path); //main_pic, labels_path);
+		 double acc = true_pred_process / static_cast<double>(pred.size());
+		// std::cout << "training accuracy = " << acc << std::endl;
 
-		tag_name_dicts= get<2>(name_and_tag_list);
-
-
-		total_img_from_name_img1 += tag_name_dicts.size();
-
-		for (const auto& [name, tag] : tag_name_dicts)
+		if (counter % 10 == 0)
 		{
-			if (tag != "0" && tag != "1") //&& count(tag_name_dicts.begin(), tag_name_dicts.end(),  tag) > 1)
-			 {
-				name_img.push_back({ name, subfolder_name.path().filename().string(), tag });
-			 }
-			if (tag != "0" && tag != "1")// && count(tag_name_dicts.begin(), tag_name_dicts.end(),  tag) > 1)
-			 {
-				tag_img.push_back({ tag, subfolder_name.path().filename().string() });
-			 }
+			clock_t end = clock();
+
+			cout << "elapsed time: " << (end-init_time)/ (double)CLOCKS_PER_SEC << endl;
+			//time = (tend - tstart) / (double)CLOCKS_PER_SEC
+			//cout << "numbers of predicted images: " << counter << endl;
+			cout << "training accuracy = " << acc << endl;
 		}
 
-	
-		total_img_from_name_img += name_img.size();
-
-		if (tag_img.empty()) 
-		{
-			continue;
-		}
-
-		int lenv = 0;
-/*
-		for (int j = 0; j < tag_img.size() - 1; j++) 
-		{
-			lenv++;
-			
-			if (tag_img[j][0] != tag_img[j+1][0])
-			{
-				int select = (rand() % (j - (j-lenv+1)+1)) + (j - lenv + 1);
-
-				train_name_tag_list.push_back({ (name_img[select][0]), (tag_img[select][0]) });
-				train_tag_list.push_back({ tag_img[select][0] });
-
-				for (int x = j - lenv + 1; x <= j; x++)
-				{
-					if (x != select) 
-					{
-						test_name_tag_list.push_back({ name_img[x][0], tag_img[x][0] });
-					}
-				}
-				lenv = 0;
-			}
-		}
-*/
-
-		for (int j=0; j<tag_img.size()- 1; j++)
-		{
-			lenv++;
-
-			if (tag_img[j][0] != tag_img[j + 1][0])
-			{
-				int select = (rand() % (j - (j - lenv + 1) + 1)) + (j - lenv + 1);
-
-				train_name_tag_list.push_back({ name_img[select][0], name_img[select][1], name_img[select][2] });
-				train_tag_list.push_back({ tag_img[select][0] });
-
-				for (int x = j - lenv + 1; x <= j; x++)
-				{
-					if (x != select)
-					{
-						test_name_tag_list.push_back({ name_img[x][0], name_img[select][1],name_img[select][2] });
-					}
-				}
-				lenv = 0;
-			}
-		}
-
-		lenv++;
-		//int select = rand() % (tag_img.size() - lenv) + (tag_img.size() - lenv);
-		int select = (rand() % (tag_img.size() - (tag_img.size()-lenv) ) ) + (tag_img.size() - lenv);
-
-		train_name_tag_list.push_back({ name_img[select][0], name_img[select][1], name_img[select][2] });
-		train_tag_list.push_back({ tag_img[select][0] });
-
-		for (int x = tag_img.size() - lenv; x < tag_img.size(); x++) 
-		{
-			if (x != select) 
-			{
-				test_name_tag_list.push_back({ name_img[x][0], name_img[select][1],name_img[select][2] });
-			}
-		}
-		name_img.clear();
-		tag_img.clear();
-
+		true_pred_process = 0;
 	}
 
-	cout << " total numbers of labeled images: " << total_img_from_name_img1 << endl;
-	cout << " total numbers of suitable labeled images: " << total_img_from_name_img << endl;
-	cout << " number of cow in test dataset: " << test_name_tag_list.size() << endl;
-	cout << " number of cows train dataset: " << train_name_tag_list.size() << endl;
-	
-	get<0>(chosen_test_train_dataset) = train_name_tag_list;
-	get<1>(chosen_test_train_dataset) = test_name_tag_list;
 
-	return chosen_test_train_dataset;
+}
 
- }
 
+int main() 
+{
+	//Tehran_University Images and Labels
+	string main_dataset_pic = "G:\\Amir-Kheiri\\Cattle Identifcation\\Datasets\\SarveenFarm\\Tehran_University1402\\selected_frames\\rgb_color";
+	string main_dataset_labels = "G:\\Amir-Kheiri\\Cattle Identifcation\\Datasets\\SarveenFarm\\Tehran_University1402\\selected_frames\\labels";
+
+		//97 Images and Labels
+	//'string main_dataset_pic= "G:\\Amir-Kheiri\\Cattle Identifcation\\Datasets\\SarveenFarm\\97\\Final\\final_dataset_onepart_dataset\\pictures";
+	//string main_dataset_labels= "G:\\Amir-Kheiri\\Cattle Identifcation\\Datasets\\SarveenFarm\\97\\Final\\final_dataset\\Labels";
+	tuple <vector<vector<string>>, vector<vector<string>>> datasets;
+	vector<vector<string>> train_name_list;
+	vector<vector<string>> test_name_list;
+
+	datasets = preprocess(main_dataset_pic, main_dataset_labels);
+	train_name_list = get<0>(datasets);
+	test_name_list  = get<1>(datasets);
+
+	map <string, Mat> train_descriptors;
+	map <string, vector<KeyPoint>> train_keypoints;
+
+	tuple < map<string,Mat>, map<string,vector<KeyPoint> > > train_descriptors_and_keypoints;
+
+	train_descriptors_and_keypoints = descriptors_of_train(main_dataset_pic, train_name_list);
+
+	train_descriptors = get<0>(train_descriptors_and_keypoints);
+	train_keypoints = get<1>(train_descriptors_and_keypoints);
+
+	matching_test_train(main_dataset_pic, train_name_list, test_name_list, train_descriptors);
+
+	//draw_mathcing(test_image, train_image, kp_test, kp_train,)
+	map <string, Mat> test2;
+
+}
